@@ -1,4 +1,4 @@
-package cosim.myelaborate
+package cosim.elaborate
 
 import freechips.rocketchip.devices.debug.DebugModuleKey
 import freechips.rocketchip.diplomacy.MonitorsEnabled
@@ -7,7 +7,6 @@ import mainargs._
 import org.chipsalliance.cde.config.{Config, Field}
 import freechips.rocketchip.rocket.{DCacheParams, FrontendModule, ICacheModule, ICacheParams, MulDivParams, Rocket, RocketCoreParams}
 import freechips.rocketchip.tile.RocketTileParams
-
 
 object RocketTileParamsKey extends Field[RocketTileParams]
 
