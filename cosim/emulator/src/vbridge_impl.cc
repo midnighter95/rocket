@@ -149,8 +149,8 @@ void VBridgeImpl::run() {
 
 
       // when RTL write back
-      if (top.rootp->DUT__DOT__ldut__DOT__tile__DOT__core__DOT__wb_valid) {
-        uint64_t pc = top.rootp->DUT__DOT__ldut__DOT__tile__DOT__core__DOT__wb_reg_pc;
+      if (vpi_get_integer("TOP.DUT.ldut.tile.core.wb_valid")) {
+        uint64_t pc = vpi_get_64("TOP.DUT.ldut.tile.core.wb_reg_pc");
         LOG(INFO) << fmt::format("RTL write back insn {:08X} ", pc);
         // Check rf write
         // todo: use rf_valid
@@ -265,10 +265,10 @@ std::optional<SpikeEvent> VBridgeImpl::create_spike_event(insn_fetch_t fetch) {
 void VBridgeImpl::record_rf_access() {
 
   // peek rtl rf access
-  uint32_t waddr = top.rootp->DUT__DOT__ldut__DOT__tile__DOT__core__DOT__rf_waddr;
-  uint64_t wdata = top.rootp->DUT__DOT__ldut__DOT__tile__DOT__core__DOT__rf_wdata;
-  uint64_t pc = top.rootp->DUT__DOT__ldut__DOT__tile__DOT__core__DOT__wb_reg_pc;
-  uint64_t insn = top.rootp->DUT__DOT__ldut__DOT__tile__DOT__core__DOT__wb_reg_inst;
+  uint32_t waddr = vpi_get_integer("TOP.DUT.ldut.tile.core.rf_waddr");
+  uint64_t wdata = vpi_get_64("TOP.DUT.ldut.tile.core.rf_wdata");
+  uint64_t pc =    vpi_get_64("TOP.DUT.ldut.tile.core.wb_reg_pc");
+  uint64_t insn =  vpi_get_64("TOP.DUT.ldut.tile.core.wb_reg_inst");
 
   uint8_t opcode = clip(insn, 0, 6);
   bool rtl_csr = opcode == 0b1110011;
@@ -308,8 +308,8 @@ void VBridgeImpl::record_rf_access() {
 
 void VBridgeImpl::receive_tl_req() {
 #define TL(name) (get_tl_##name(top))
-  uint64_t pc = top.rootp->DUT__DOT__ldut__DOT__tile__DOT__core__DOT__ex_reg_pc;
-  int miss = top.rootp->DUT__DOT__ldut__DOT__tile__DOT__frontend__DOT__icache__DOT__s2_miss;
+  uint64_t pc = vpi_get_64("TOP.DUT.ldut.tile.core.ex_reg_pc");
+  int miss = vpi_get_integer("TOP.DUT.ldut.tile.frontend.icache.s2_miss");
   int valid = TL(a_valid);
   if (!TL(a_valid)) return;
   // store A channel req
