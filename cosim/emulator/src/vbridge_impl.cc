@@ -85,7 +85,6 @@ void VBridgeImpl::init_spike() {
   sim.load(bin, ebin, reset_vector);
 }
 
-SpikeEvent *find_se_to_issue();
 void VBridgeImpl::init_simulator() {
   Verilated::traceEverOn(true);
   top.trace(&tfp, 99);
@@ -108,11 +107,6 @@ uint8_t VBridgeImpl::load(uint64_t address) {
   return *sim.addr_to_mem(address);
 }
 
-/* For TL Acquire
- * Record mem info in se.block when init spike event;
- * receive tl Acquire, find corresponding SE in queue. store se.block info in AcquireBanks;set AcquireBanks.remaining as true;
- * return: drive D channel with AcquireBanks
- * */
 void VBridgeImpl::run() {
 
   init_spike();
@@ -153,17 +147,14 @@ void VBridgeImpl::run() {
         uint64_t pc = vpi_get_64("TOP.DUT.ldut.tile.core.wb_reg_pc");
         LOG(INFO) << fmt::format("RTL write back insn {:08X} ", pc);
         // Check rf write
-        // todo: use rf_valid
         if (top.rootp->DUT__DOT__ldut__DOT__tile__DOT__core__DOT____Vcellinp__rf_ext__W0_en) {
           record_rf_access();
         }
-        // commit spike event
+        // commit spike event in queue and pop it
         bool commit = false;
-
         for (auto se_iter = to_rtl_queue.rbegin(); se_iter != to_rtl_queue.rend(); se_iter++) {
           if (se_iter->pc == pc) {
-            // mechanism to the insn which causes trap.
-            // trapped insn will commit with the first insn after trap(0x80000004).
+            // trap insn will commit with the first insn after trap(0x80000004).
             // It demands the trap insn not to be the last one in the queue.
             if (se_iter->pc == 0x80000004) {
               for (auto se_it = to_rtl_queue.rbegin(); se_it != to_rtl_queue.rend(); se_it++) {
@@ -211,7 +202,8 @@ void VBridgeImpl::loop_until_se_queue_full() {
                              se_iter->pc, se_iter->rd_idx, se_iter->rd_old_bits, se_iter->rd_new_bits, se_iter->is_committed);
   }
 }
-// don't creat spike event for csr insn
+
+// create spike event for every insn
 // todo: haven't created spike event for insn which traps during fetch stage;
 // dealing with trap:
 // most traps are dealt by Spike when [proc.step(1)];
@@ -253,15 +245,16 @@ std::optional<SpikeEvent> VBridgeImpl::spike_step() {
     return {};
   }
 }
-// now we take all the instruction as spike event except csr insn
+
+// create spike event for every insn
 std::optional<SpikeEvent> VBridgeImpl::create_spike_event(insn_fetch_t fetch) {
   return SpikeEvent{proc, fetch, this};
 }
 
-// For every RTL commit event, finds the corresponding Spike event and checks their results.
+// Find the corresponding Spike event in queue and compare their results with RTL peek.
 // two types of failure:
 // 1: can't find spike event in queue
-// 2: results mismatch
+// 2: results check fails
 void VBridgeImpl::record_rf_access() {
 
   // peek rtl rf access
@@ -273,7 +266,7 @@ void VBridgeImpl::record_rf_access() {
   uint8_t opcode = clip(insn, 0, 6);
   bool rtl_csr = opcode == 0b1110011;
 
-  // exclude those rtl reg_write from csr insn
+  // todo:add support for csr
   if (!rtl_csr) {
     LOG(INFO) << fmt::format("RTL wirte reg({}) = {:08X}, pc = {:08X}", waddr, wdata, pc);
     // find corresponding spike event
@@ -286,7 +279,6 @@ void VBridgeImpl::record_rf_access() {
     }
     if (se == nullptr) {
       for (auto se_iter = to_rtl_queue.rbegin(); se_iter != to_rtl_queue.rend(); se_iter++) {
-        // LOG(INFO) << fmt::format("se pc = {:08X}, rd_idx = {:08X}",se_iter->pc,se_iter->rd_idx);
         LOG(INFO) << fmt::format("List: spike pc = {:08X}, write reg({}) from {:08x} to {:08X}, is commit:{}",
                                  se_iter->pc, se_iter->rd_idx, se_iter->rd_old_bits, se_iter->rd_new_bits, se_iter->is_committed);
       }
@@ -305,7 +297,11 @@ void VBridgeImpl::record_rf_access() {
   }
 }
 
-
+/* For TL Acquire
+ * Record mem info in se.block when init spike event;
+ * receive tl Acquire, find corresponding SE in queue. store se.block info in AcquireBanks;set AcquireBanks.remaining as true;
+ * return: drive D channel with AcquireBanks
+ */
 void VBridgeImpl::receive_tl_req() {
 #define TL(name) (get_tl_##name(top))
   uint64_t pc = vpi_get_64("TOP.DUT.ldut.tile.core.ex_reg_pc");
@@ -361,7 +357,7 @@ void VBridgeImpl::receive_tl_req() {
       break;
     }
   }
-  // list the queue if error
+  // Error if can't find SE
   if (se == nullptr) {
     for (auto se_iter = to_rtl_queue.rbegin(); se_iter != to_rtl_queue.rend(); se_iter++) {
       LOG(INFO) << fmt::format("List: spike pc = {:08X}, write reg({}) from {:08x} to {:08X}, is commit:{}",
@@ -372,7 +368,6 @@ void VBridgeImpl::receive_tl_req() {
   }
 
   switch (opcode) {
-
     case TlOpcode::Get: {
       auto mem_read = se->mem_access_record.all_reads.find(addr);
       CHECK_S(mem_read != se->mem_access_record.all_reads.end())
@@ -427,6 +422,10 @@ void VBridgeImpl::receive_tl_req() {
       break;
     }
 
+    default: {
+      LOG(FATAL) << fmt::format("unknown tl opcode {}", opcode);
+    }
+
 #undef TL
   }
 }
@@ -466,7 +465,6 @@ void VBridgeImpl::return_fetch_response() {
       aqu_valid = true;
     }
   }
-output:
   TL(d_bits_source) = source;
   TL(d_bits_size) = size;
   TL(d_valid) = fetch_valid | aqu_valid;
