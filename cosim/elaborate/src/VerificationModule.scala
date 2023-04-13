@@ -109,21 +109,21 @@ class VerificationModule(dut:DUT) extends TapModule {
   val dpiBasePeek = Module(new ExtModule with HasExtModuleInline {
     override val desiredName = "dpiBasePeek"
     val clock = IO(Input(Clock()))
-    val address = IO(Input(UInt(32.W)))
+    val address = IO(Input(UInt(39.W)))
     setInline(
       s"$desiredName.sv",
       s"""module $desiredName(
          |  input clock,
-         |  input [31:0] address
+         |  input [38:0] address
          |);
-         |  import "DPI-C" function void dpiBasePeek(input bit[31:0] address);
+         |  import "DPI-C" function void dpiBasePeek(input bit[38:0] address);
          |
          |  always @ (negedge clock) $desiredName(address);
          |endmodule
          |""".stripMargin
     )
   })
-  dpiBasePeek.address := tlportA.bits.address
+  dpiBasePeek.address := tap(dut.ldut.rocketTile.frontend.icache.module.io.req.bits.addr)
   dpiBasePeek.clock := clock
 
   @instantiable
