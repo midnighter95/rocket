@@ -5,7 +5,7 @@ import chisel3.util.Decoupled
 import freechips.rocketchip.diplomacy.{AddressSet, BundleBridgeSource, InModuleBody, LazyModule, RegionType, SimpleLazyModule, TransferSizes}
 import freechips.rocketchip.interrupts.{IntSinkNode, IntSinkPortSimple, IntSourceNode, IntSourcePortSimple}
 import freechips.rocketchip.subsystem._
-import freechips.rocketchip.tilelink.{TLManagerNode, TLSlaveParameters, TLSlavePortParameters}
+import freechips.rocketchip.tilelink.{TLEphemeralNode, TLIdentityNode, TLManagerNode, TLSlaveParameters, TLSlavePortParameters}
 import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.tile.{NMI, PriorityMuxHartIdFromSeq, RocketTile}
 import org.chipsalliance.tilelink.bundle._
@@ -80,6 +80,15 @@ class DUT(p: Parameters) extends Module {
     }
   })
 
+  ldut.rocketTile.getNodes.map(c => {
+    c match {
+      //case n:TLIdentityNode => println("find TLIdentityNode name= "+ c.name)
+
+      case _ => {println("find name=" + c.name + "   "+ c.getClass)}
+    }
+
+  })
+
   val tlAParam = TileLinkChannelAParameter(32,2,64,3)
   val tlBParam = TileLinkChannelBParameter(32,2,64,3)
   val tlCParam = TileLinkChannelCParameter(32,2,64,3)
@@ -105,7 +114,7 @@ class DUT(p: Parameters) extends Module {
     Module(ldut.module)
   ).filterNot(_._2.isInstanceOf[Aggregate]).foreach { case (name, ele) =>
       name match {
-        case "clock" => {}
+        case "clock" =>{}
         case "reset" => {}
         case "nmi_rnmi" => ele := nmi.rnmi
         case "nmi_rnmi_interrupt_vector" => ele := nmi.rnmi_interrupt_vector
