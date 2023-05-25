@@ -11,7 +11,7 @@ env:
 on:
   push:
     branches:
-      - split
+      - ci
   pull_request:
     branches:
       - split
