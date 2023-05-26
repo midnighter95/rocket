@@ -38,4 +38,4 @@ jobs:
 
       - name: run riscv-32tests
         run: |
-          nix --experimental-features 'nix-command flakes' develop -c mill -i -j tests.riscvtests.run[${{matrix.config}}]
+          nix --experimental-features 'nix-command flakes' develop -c mill -i -j 0 tests.riscvtests.run[${{matrix.config}}]
